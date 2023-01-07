@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/koding/tunnel"
+	"github.com/programmare-labs/tunnel"
 )
 
 var (

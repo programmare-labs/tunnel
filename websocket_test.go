@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/koding/tunnel/tunneltest"
+	"github.com/programmare-labs/tunnel/tunneltest"
 )
 
 func testWebsocket(name string, n int, t *testing.T, tt *tunneltest.TunnelTest) {

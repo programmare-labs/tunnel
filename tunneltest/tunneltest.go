@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/koding/tunnel"
+	"github.com/programmare-labs/tunnel"
 )
 
 var debugNet = os.Getenv("DEBUGNET") == "1"

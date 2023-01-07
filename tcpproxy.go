@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/koding/logging"
-	"github.com/koding/tunnel/proto"
+	"github.com/programmare-labs/tunnel/proto"
 )
 
 var (

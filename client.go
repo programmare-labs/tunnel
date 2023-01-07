@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/koding/logging"
-	"github.com/koding/tunnel/proto"
+	"github.com/programmare-labs/tunnel/proto"
 
 	"github.com/hashicorp/yamux"
 )

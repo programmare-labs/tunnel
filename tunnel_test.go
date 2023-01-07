@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/koding/tunnel"
-	"github.com/koding/tunnel/tunneltest"
+	"github.com/programmare-labs/tunnel"
+	"github.com/programmare-labs/tunnel/tunneltest"
 
 	"github.com/cenkalti/backoff"
 )

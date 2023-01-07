@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -18,7 +19,7 @@ import (
 	"time"
 
 	"github.com/koding/logging"
-	"github.com/koding/tunnel/proto"
+	"github.com/programmare-labs/tunnel/proto"
 
 	"github.com/hashicorp/yamux"
 )
@@ -692,8 +693,8 @@ func (s *Server) checkConnect(fn func(w http.ResponseWriter, r *http.Request) er
 			if identifier := r.Header.Get(proto.ClientIdentifierHeader); identifier != "" {
 				s.onDisconnect(identifier, err)
 			}
-
-			http.Error(w, err.Error(), 502)
+			log.Println("find error")
+			http.Error(w, err.Error(), http.StatusBadGateway)
 		}
 	})
 }

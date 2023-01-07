@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/koding/logging"
-	"github.com/koding/tunnel/proto"
+	"github.com/programmare-labs/tunnel/proto"
 )
 
 // ProxyFunc is responsible for forwarding a remote connection to local server and writing the response back.
@@ -39,9 +39,13 @@ func Proxy(p ProxyFuncs) ProxyFunc {
 		var f ProxyFunc
 		switch msg.Protocol {
 		case proto.HTTP:
-			f = DefaultProxyFuncs.HTTP
-			if p.HTTP != nil {
-				f = p.HTTP
+			// f = DefaultProxyFuncs.HTTP
+			// if p.HTTP != nil {
+			// 	f = p.HTTP
+			// }
+			f = DefaultProxyFuncs.TCP
+			if p.TCP != nil {
+				f = p.TCP
 			}
 		case proto.TCP:
 			f = DefaultProxyFuncs.TCP
