@@ -39,13 +39,9 @@ func Proxy(p ProxyFuncs) ProxyFunc {
 		var f ProxyFunc
 		switch msg.Protocol {
 		case proto.HTTP:
-			// f = DefaultProxyFuncs.HTTP
-			// if p.HTTP != nil {
-			// 	f = p.HTTP
-			// }
-			f = DefaultProxyFuncs.TCP
-			if p.TCP != nil {
-				f = p.TCP
+			f = DefaultProxyFuncs.HTTP
+			if p.HTTP != nil {
+				f = p.HTTP
 			}
 		case proto.TCP:
 			f = DefaultProxyFuncs.TCP

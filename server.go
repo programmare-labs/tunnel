@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -693,7 +692,6 @@ func (s *Server) checkConnect(fn func(w http.ResponseWriter, r *http.Request) er
 			if identifier := r.Header.Get(proto.ClientIdentifierHeader); identifier != "" {
 				s.onDisconnect(identifier, err)
 			}
-			log.Println("find error")
 			http.Error(w, err.Error(), http.StatusBadGateway)
 		}
 	})
