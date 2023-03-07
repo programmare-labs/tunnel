@@ -1,77 +1,112 @@
 package tunnel
 
 import (
+	"errors"
 	"sync"
 )
 
-type vhostStorage interface {
+type VhostStorage interface {
 	// AddHost adds the given host and identifier to the storage
-	AddHost(host, identifier string)
+	AddHost(host VirtualHost, identifier string)
 
 	// DeleteHost deletes the given host
 	DeleteHost(host string)
 
 	// GetHost returns the host name for the given identifier
-	GetHost(identifier string) (string, bool)
+	GetHost(identifier string) (VirtualHost, bool)
 
 	// GetIdentifier returns the identifier for the given host
 	GetIdentifier(host string) (string, bool)
+
+	// GetNextHost returns next host on mapping
+	GetNextHost() (VirtualHost, error)
 }
 
-type virtualHost struct {
-	identifier string
+type VirtualHost struct {
+	Identifier    string
+	Port          string
+	RemoteAddress string
 }
 
 // virtualHosts is used for mapping host to users example: host
 // "fs-1-fatih.kd.io" belongs to user "arslan"
-type virtualHosts struct {
-	mapping map[string]*virtualHost
+type VirtualHosts struct {
+	Mapping map[string]*VirtualHost
+	Last    int
 	sync.Mutex
 }
 
 // newVirtualHosts provides an in memory virtual host storage for mapping
 // virtual hosts to identifiers.
-func newVirtualHosts() *virtualHosts {
-	return &virtualHosts{
-		mapping: make(map[string]*virtualHost),
+func NewVirtualHosts() *VirtualHosts {
+	return &VirtualHosts{
+		Mapping: make(map[string]*VirtualHost),
+		Last:    0,
 	}
 }
 
-func (v *virtualHosts) AddHost(host, identifier string) {
+func (v *VirtualHosts) AddHost(vHost VirtualHost, identifier string) {
 	v.Lock()
-	v.mapping[host] = &virtualHost{identifier: identifier}
+	v.Mapping[identifier] = &VirtualHost{
+		Identifier:    vHost.Identifier,
+		Port:          vHost.Port,
+		RemoteAddress: vHost.RemoteAddress,
+	}
 	v.Unlock()
 }
 
-func (v *virtualHosts) DeleteHost(host string) {
+func (v *VirtualHosts) DeleteHost(identifier string) {
 	v.Lock()
-	delete(v.mapping, host)
+	delete(v.Mapping, identifier)
 	v.Unlock()
 }
 
 // GetIdentifier returns the identifier associated with the given host
-func (v *virtualHosts) GetIdentifier(host string) (string, bool) {
+func (v *VirtualHosts) GetIdentifier(hostID string) (string, bool) {
 	v.Lock()
-	ht, ok := v.mapping[host]
+	ht, ok := v.Mapping[hostID]
 	v.Unlock()
 
 	if !ok {
 		return "", false
 	}
 
-	return ht.identifier, true
+	return ht.Identifier, true
 }
 
-// GetHost returns the host associated with the given identifier
-func (v *virtualHosts) GetHost(identifier string) (string, bool) {
+// GetNextHost returns the next host in the map
+func (v *VirtualHosts) GetNextHost() (VirtualHost, error) {
+
 	v.Lock()
 	defer v.Unlock()
 
-	for hostname, hst := range v.mapping {
-		if hst.identifier == identifier {
-			return hostname, true
-		}
+	if v.Last == 0 && len(v.Mapping) == 0 {
+		return VirtualHost{}, errors.New("there is no open connections")
 	}
 
-	return "", false
+	index := 0
+	for _, value := range v.Mapping {
+		if index == v.Last {
+			if v.Last == (len(v.Mapping) - 1) {
+				v.Last = 0
+			}
+			v.Last += 1
+			return *value, nil
+		}
+		index += 1
+	}
+	return VirtualHost{}, errors.New("could not find next host")
+
+}
+
+// GetHost returns the host associated with the given identifier
+func (v *VirtualHosts) GetHost(identifier string) (VirtualHost, bool) {
+	v.Lock()
+	ht, ok := v.Mapping[identifier]
+	v.Unlock()
+	if !ok {
+		return VirtualHost{}, false
+	}
+
+	return *ht, true
 }

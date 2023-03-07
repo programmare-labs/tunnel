@@ -46,7 +46,7 @@ type Server struct {
 	controls *controls
 
 	// virtualHosts is used to map public hosts to remote clients.
-	virtualHosts vhostStorage
+	VirtualHosts VhostStorage
 
 	// virtualAddrs.
 	virtualAddrs *vaddrStorage
@@ -132,7 +132,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		sessions:              make(map[string]*yamux.Session),
 		onConnectCallbacks:    newCallbacks("OnConnect"),
 		onDisconnectCallbacks: newCallbacks("OnDisconnect"),
-		virtualHosts:          newVirtualHosts(),
+		VirtualHosts:          NewVirtualHosts(),
 		virtualAddrs:          newVirtualAddrs(opts),
 		controls:              newControls(),
 		states:                make(map[string]ClientState),
@@ -160,6 +160,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.handleHTTP(w, r); err != nil {
+
 		if !strings.Contains(err.Error(), "no virtual host available") { // this one is outputted too much, unnecessarily
 			s.log.Error("remote %s (%s): %s", r.RemoteAddr, r.RequestURI, err)
 		}
@@ -169,36 +170,51 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleHTTP handles a single HTTP request
 func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) error {
-	s.log.Debug("HandleHTTP request:")
-	s.log.Debug("%v", r)
 
 	if s.httpDirector != nil {
 		s.httpDirector(r)
 	}
 
-	hostPort := strings.ToLower(r.Host)
-	if hostPort == "" {
-		return errors.New("request host is empty")
-	}
+	// hostPort := strings.ToLower(r.Host)
+	// if hostPort == "" {
+	// 	s.log.Info("-------------------------------------------------host empty------------------------------------------------------")
+	// 	return errors.New("request host is empty")
+	// }
 
-	// if someone hits foo.example.com:8080, this should be proxied to
-	// localhost:8080, so send the port to the client so it knows how to proxy
-	// correctly. If no port is available, it's up to client how to interpret it
-	host, port, err := parseHostPort(hostPort)
+	// // if someone hits foo.example.com:8080, this should be proxied to
+	// // localhost:8080, so send the port to the client so it knows how to proxy
+	// // correctly. If no port is available, it's up to client how to interpret it
+	// host, port, err := parseHostPort(hostPort)
+	// if err != nil {
+	// 	s.log.Info("-------------------------------------------------no port available------------------------------------------------------")
+	// 	// no need to return, just continue lazily, port will be 0, which in
+	// 	// our case will be proxied to client's local servers port 80
+	// 	s.log.Debug("No port available for %q, sending port 80 to client", hostPort)
+	// }
+
+	// // get the identifier associated with this host
+	// identifier, ok := s.getIdentifier(hostPort)
+	// if !ok {
+	// 	// fallback to host
+	// 	identifier, ok = s.getIdentifier(host)
+	// 	if !ok {
+	// 		s.log.Info("-------------------------------------------------no host available------------------------------------------------------")
+	// 		return fmt.Errorf("no virtual host available for %q", hostPort)
+	// 	}
+	// }
+
+	vHost, err := s.getNextHost()
 	if err != nil {
-		// no need to return, just continue lazily, port will be 0, which in
-		// our case will be proxied to client's local servers port 80
-		s.log.Debug("No port available for %q, sending port 80 to client", hostPort)
+		s.log.Info("no host available")
+		return fmt.Errorf("no host available %s", err)
 	}
 
-	// get the identifier associated with this host
-	identifier, ok := s.getIdentifier(hostPort)
-	if !ok {
-		// fallback to host
-		identifier, ok = s.getIdentifier(host)
-		if !ok {
-			return fmt.Errorf("no virtual host available for %q", hostPort)
-		}
+	identifier := vHost.Identifier
+
+	port, err := strconv.Atoi(vHost.Port)
+	if err != nil {
+		s.log.Info("cannot convert string to int")
+		return fmt.Errorf("internal error: %s", err)
 	}
 
 	if isWebsocketConn(r) {
@@ -257,6 +273,7 @@ func (s *Server) serveTCP() {
 }
 
 func (s *Server) serveTCPConn(conn net.Conn) {
+
 	err := s.handleTCPConn(conn)
 	if err != nil {
 		s.log.Warning("failed to serve %q: %s", conn.RemoteAddr(), err)
@@ -308,6 +325,7 @@ func (s *Server) handleWSConn(w http.ResponseWriter, r *http.Request, ident stri
 }
 
 func (s *Server) handleTCPConn(conn net.Conn) error {
+
 	ident, ok := s.virtualAddrs.getIdent(conn)
 	if !ok {
 		return fmt.Errorf("no virtual address available for %s", conn.LocalAddr())
@@ -392,6 +410,7 @@ func (s *Server) dial(identifier string, p proto.Type, port int) (net.Conn, erro
 // controlHandler is used to capture incoming tunnel connect requests into raw
 // tunnel TCP connections.
 func (s *Server) controlHandler(w http.ResponseWriter, r *http.Request) (ctErr error) {
+
 	identifier := r.Header.Get(proto.ClientIdentifierHeader)
 	_, ok := s.getHost(identifier)
 	if !ok {
@@ -579,14 +598,14 @@ func (s *Server) changeState(identifier string, state ClientState, err error) (p
 }
 
 // AddHost adds the given virtual host and maps it to the identifier.
-func (s *Server) AddHost(host, identifier string) {
-	s.virtualHosts.AddHost(host, identifier)
+func (s *Server) AddHost(host VirtualHost, identifier string) {
+	s.VirtualHosts.AddHost(host, identifier)
 }
 
 // DeleteHost deletes the given virtual host. Once removed any request to this
 // host is denied.
 func (s *Server) DeleteHost(host string) {
-	s.virtualHosts.DeleteHost(host)
+	s.VirtualHosts.DeleteHost(host)
 }
 
 // AddAddr starts accepting connections on listener l, routing every connection
@@ -613,13 +632,18 @@ func (s *Server) DeleteAddr(l net.Listener, ip net.IP) {
 }
 
 func (s *Server) getIdentifier(host string) (string, bool) {
-	identifier, ok := s.virtualHosts.GetIdentifier(host)
+	identifier, ok := s.VirtualHosts.GetIdentifier(host)
 	return identifier, ok
 }
 
-func (s *Server) getHost(identifier string) (string, bool) {
-	host, ok := s.virtualHosts.GetHost(identifier)
+func (s *Server) getHost(identifier string) (VirtualHost, bool) {
+	host, ok := s.VirtualHosts.GetHost(identifier)
 	return host, ok
+}
+
+func (s *Server) getNextHost() (VirtualHost, error) {
+	vHost, err := s.VirtualHosts.GetNextHost()
+	return vHost, err
 }
 
 func (s *Server) addControl(identifier string, conn *control) {

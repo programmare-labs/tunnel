@@ -24,7 +24,7 @@ func testWebsocket(name string, n int, t *testing.T, tt *tunneltest.TunnelTest) 
 
 		err := conn.WriteJSON(want)
 		if err != nil {
-			t.Errorf("(test %s) %d: failed sending %q: %s", name, i, want, err)
+			t.Errorf("(test %s) %d: failed sending %v: %s", name, i, want, err)
 			continue
 		}
 

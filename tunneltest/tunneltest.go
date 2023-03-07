@@ -309,7 +309,11 @@ func (tt *TunnelTest) serveSingle(ident string, t *Tunnel) (bool, error) {
 
 		go (&http.Server{Handler: h}).Serve(l)
 
-		tt.Server.AddHost(localAddr, ident)
+		vHost := tunnel.VirtualHost{
+			Identifier: localAddr,
+		}
+
+		tt.Server.AddHost(vHost, ident)
 
 		tt.mu.Lock()
 		tt.Listeners[ident] = [2]net.Listener{l, nil}
